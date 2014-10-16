@@ -1,5 +1,13 @@
+"""
+    This is the backend for the phone directory application. 
+    It uses Flask as the router and twilio as the phone voice interface. 
+    The capabilities of this application are to: 
+        (1) Allow the user to check their phone number in the database based on their user ID
+        (2) Allow the user to update their phone number in the database based on their user ID
+"""
+
 from flask import Flask, request, redirect
-import twilio.twiml as twiml
+from twilio import twiml
  
 app = Flask(__name__)
 
@@ -17,85 +25,79 @@ userPhones = {
     "8888":"909-776-8837"
 }
 
+
 @app.route('/', methods=['POST'])
 def intro():
+    """ 
+    Landing page for this application. 
+    Prompts the user for their ID 
+    """
     response = twiml.Response()
-    with response.gather(numDigits=4, action="/gather") as gather:
+    with response.gather(numDigits=4, action='/gatherId') as gather:
         gather.say("Hello welcome to Phone Cosse! If you have a user account please enter it now.")
     return str(response)
  
-@app.route('/gather', methods=['POST'])
-def gather():
+@app.route('/gatherId', methods=['POST'])
+def gatherId():
+    """
+    Get the user ID. 
+    Say current phone number. 
+    Allow user to change phone number. 
+    Redirects to /agreeChangePhone
+    """
     response = twiml.Response()
     digits = request.form['Digits']
     if digits in userIds:
-        with response.gather(numDigits=1, action="/agreeChangePhone") as gather: 
+        with response.gather(numDigits=1, action='/agreeChangePhone') as gather: 
             # pull user ID and phone number here
-            gather.say("Welcome " + userIds[digits] + "Your current telephone number is " + userPhones[digits] +". If you would like to change it please press 1. If not you can hang up now")
+            speech = "Welcome {}. Your current telephone number is {}.  If you would like to change it please press 1. If not you can hang up now.".format(userIds[digits],userPhones[digits])
+            gather.say(speech)
     else:
-        with response.gather(numDigits=4, action="/gather") as gather:
+        with response.gather(numDigits=4, action='/gatherId') as gather:
             gather.say("Sorry that number is invalid. Please try again.")
     return str(response)
     
 @app.route('/agreeChangePhone', methods=['POST'])
 def agreeChangePhone():
+    """
+    Route user to change their phone number if they pressed 1. 
+    Redirects to /confirmPhone.
+    """
     response = twiml.Response()
     digits = request.form['Digits']
     if digits == "1":
-        with response.gather(numDigits=10, action="/gatherPhone") as gather: 
+        with response.gather(numDigits=10, action='/confirmPhone') as gather: 
             gather.say("Please enter your 10 digit phone number now.")
     return str(response)
     
-@app.route('/gatherPhone',methods=['POST'])
-def gatherPhone(): 
+@app.route('/confirmPhone',methods=['POST'])
+def confirmPhone(): 
+    """
+    Re-iterate the phone number that was entered by the user. 
+    Prompt them to confirm whether or not it was correct. 
+    """
     response = twiml.Response()
     digits = request.form['Digits']
-    with response.gather(numDigits=2, action="/verifyPhone") as gather: 
-        gather.say("You have just entered " + digits[0:3] + "-" + digits[3:6] + "-" + digits[6:10] + " as your new phone number. If this is correct please press 1. If this is incorrect please press 2 to try again.")
+    with response.gather(numDigits=2, action='/savePhone') as gather: 
+        speech = "You have just entered {}-{}-{} as your new phone number. If this is correct please press 1. If this is incorrect please press 2 to try again.".format(digits[0:3],digits[3:6],digits[6:10]) 
+        gather.say(speech)
     return str(response)
 
-@app.route('/verifyPhone',methods=['POST'])
-def verifyPhone(): 
+@app.route('/savePhone',methods=['POST'])
+def savePhone(): 
+    """
+    Saves phone number if user confirms it was input correctly  
+    Redirects to enter the phone number if it was not entered correctly. --> /confirmPhone
+    """
     response = twiml.Response()
     digits = request.form['Digits']
-    if digits=="1": 
+    if digits == "1": 
         # Update database here 
         response.say("Thank you your number has been changed successfully!")
-    if digits=="2": 
-        with response.gather(numDigits=10, action="/gatherPhone") as gather: 
+    if digits == "2": 
+        with response.gather(numDigits=10, action='/confirmPhone') as gather: 
             gather.say("Please enter your 10 digit phone number now.")
     return str(response)
-
-
-
-"""
-@app.route('/', methods=['GET','POST'])
-def intro(): 
-    resp = twiml.Response()
-    with resp.gather(numDigits=4, action='/gather') as gatherId: 
-        gather.say("Hello welcome to Phone Cosse! If you have a user account please enter it now.")
-    return str(response)
-
-@app.route('/gather', methods=['POST'])
-def gather(): 
-    resp = twiml.Response()
-    digits = request.form['Digits']
-    if digits in userIds: 
-        resp.say("You are in our database")
-    else: 
-        resp.say("Sorry this number is not valid")
-    return str(resp)
-
-
-@app.route("/", methods=['GET', 'POST'])
-def hello_monkey():
-    response = twiml.Response()
-    response.say("hello") 
-    return str(response)
-    
-        
-"""
-
 
 if __name__ == "__main__":
     app.run(debug=True)
